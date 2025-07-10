@@ -1,0 +1,29 @@
+[
+  {
+    "id": "1751967480876",
+    "userId": "1751955594791",
+    "name": "Food",
+    "limit": 1000,
+    "icon": "🍽️",
+    "color": "#FF6B6B",
+    "alertThreshold": 80
+  },
+  {
+    "id": "1751972764903",
+    "userId": "1751955594791",
+    "name": "Travel",
+    "limit": 1000,
+    "icon": "🚗",
+    "color": "#FF6B6B",
+    "alertThreshold": 80
+  },
+  {
+    "id": "1752136000999",
+    "userId": "1752135891565",
+    "name": "Fooed",
+    "limit": 1000,
+    "icon": "🍽️",
+    "color": "#FF6B6B",
+    "alertThreshold": 80
+  }
+]

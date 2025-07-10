@@ -1,0 +1,92 @@
+[
+  {
+    "id": "1751957460267",
+    "userId": "1751955594791",
+    "amount": 1200,
+    "type": "expense",
+    "category": "Shopping",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751957649412",
+    "userId": "1751955594791",
+    "amount": 40000,
+    "type": "income",
+    "category": "Salary",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751965648530",
+    "userId": "1751955594791",
+    "amount": 2000,
+    "type": "expense",
+    "category": "Transport",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751977127550",
+    "userId": "1751955594791",
+    "amount": 11500,
+    "type": "expense",
+    "category": "Utilities",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751977154260",
+    "userId": "1751955594791",
+    "amount": 50000,
+    "type": "income",
+    "category": "Salary",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751977218829",
+    "userId": "1751955594791",
+    "amount": 10000,
+    "type": "expense",
+    "category": "Utilities",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751977239165",
+    "userId": "1751955594791",
+    "amount": 20000,
+    "type": "expense",
+    "category": "Utilities",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1751977285347",
+    "userId": "1751955594791",
+    "amount": 500,
+    "type": "expense",
+    "category": "Groceries",
+    "date": "2025-07-08",
+    "note": ""
+  },
+  {
+    "id": "1752135954155",
+    "userId": "1752135891565",
+    "amount": 40000,
+    "type": "income",
+    "category": "Salary",
+    "date": "2025-07-10",
+    "note": ""
+  },
+  {
+    "id": "1752135974251",
+    "userId": "1752135891565",
+    "amount": 2000,
+    "type": "expense",
+    "category": "Groceries",
+    "date": "2025-07-10",
+    "note": ""
+  }
+]

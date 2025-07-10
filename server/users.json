@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1751955594791",
+    "email": "durga@gmail.com",
+    "password": "$2b$10$VkdT3WVaYVtifirRdiZyluBQXOY.n/r8HlP8kP0ao0Up8DxOEztTq",
+    "name": "durga",
+    "avatar": "",
+    "createdAt": "2025-07-08T06:19:54.792Z"
+  },
+  {
+    "id": "1752135891565",
+    "email": "test@gmail.com",
+    "password": "$2b$10$JrEAUQpan.fXbJI5zbq24OsY6.qagOae1DuQb.Avvq5hL.LfDFekK",
+    "name": "test",
+    "avatar": "",
+    "createdAt": "2025-07-10T08:24:51.566Z"
+  }
+]

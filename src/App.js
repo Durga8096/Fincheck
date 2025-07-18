@@ -20,27 +20,27 @@ import Budget from './components/budget';
 function App() {
   return (
     <AuthProvider>
-    <Router>
-      <div className="flex flex-col min-h-screen bg-[#FFFAFA]">
-      <Header />
-        <div className="">
-          <Routes>
-            <Route path="/" element={<Hero />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />}>
-            <Route path="/dashboard/home" element={<Home />} />
-            <Route path="/dashboard/analytics" element={<Analytics />} />
-            <Route path="/dashboard/transactions" element={<Transactions />} />
-            <Route path="/dashboard/budget" element={<Budget />} />
-            <Route path="/dashboard/settings" element={<Settings />} />
-            <Route path="/dashboard/profile" element={<Profile />} />
-          </Route>
-          </Routes>
+      <Router>
+        <div className="flex flex-col min-h-screen bg-[#FFFAFA]">
+          <Header />
+          <div className="">
+            <Routes>
+              <Route path="/" element={<Hero />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/dashboard" element={<Dashboard />}>
+                <Route path="/dashboard/" element={<Home />} />
+                <Route path="/dashboard/analytics" element={<Analytics />} />
+                <Route path="/dashboard/transactions" element={<Transactions />} />
+                <Route path="/dashboard/budget" element={<Budget />} />
+                <Route path="/dashboard/settings" element={<Settings />} />
+                <Route path="/dashboard/profile" element={<Profile />} />
+              </Route>
+            </Routes>
+          </div>
+          <Footer />
         </div>
-        <Footer />
-      </div>
-    </Router>
+      </Router>
     </AuthProvider>
   );
 }

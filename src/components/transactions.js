@@ -14,7 +14,9 @@ import {
   apiGetTransactions,
   apiAddTransaction,
   apiUpdateTransaction,
-  apiDeleteTransaction
+  apiDeleteTransaction,
+  apiGetBudgets,
+  apiAddBudget
 } from '../api';
 
 // Utility for INR formatting
@@ -40,9 +42,14 @@ const Transactions = () => {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [error, setError] = useState('');
+  const [budgets, setBudgets] = useState([]);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryLimit, setNewCategoryLimit] = useState('');
 
   useEffect(() => {
     fetchTransactions();
+    fetchBudgets();
   }, []);
 
   const fetchTransactions = async () => {
@@ -58,10 +65,21 @@ const Transactions = () => {
     setLoading(false);
   };
 
-  const categories = [
-    'Groceries', 'Salary', 'Utilities', 'Entertainment', 'Freelance', 
-    'Transport', 'Healthcare', 'Shopping', 'Dining', 'Education'
-  ];
+  const fetchBudgets = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const bgs = await apiGetBudgets(token);
+      setBudgets(bgs);
+    } catch (err) {
+      // Optionally handle error
+    }
+  };
+
+  // Build a unified list of categories from budgets and transactions
+  const allCategories = Array.from(new Set([
+    ...budgets.map(b => b.name),
+    ...transactions.map(t => t.category)
+  ])).filter(Boolean);
 
   const getCategoryIcon = (category) => {
     const icons = {
@@ -89,29 +107,55 @@ const Transactions = () => {
 
   const handleAddTransaction = async (e) => {
     e.preventDefault();
-    console.log('Submitting transaction'); // DEBUG LOG
     setError('');
+    // Prevent submission if no category is selected
+    const finalCategory = showNewCategoryInput && newCategoryName ? newCategoryName : transactionCategory;
+    if (!finalCategory) {
+      setError('Please select or enter a category.');
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
+      let selectedBudget = budgets.find(b => b.name === finalCategory);
+      // If adding a new category and it's an expense, create a new budget
+      if (transactionType === 'expense' && showNewCategoryInput && newCategoryName) {
+        const newBudget = await apiAddBudget({
+          name: newCategoryName,
+          limit: parseFloat(newCategoryLimit) || 1, // Use user input, fallback to 1
+          color: '#FF6B6B',
+          icon: '📊',
+          alertThreshold: 80
+        }, token);
+        selectedBudget = newBudget;
+      }
       const newTransaction = {
         type: transactionType,
         amount: parseFloat(transactionAmount),
-        category: transactionCategory,
+        category: finalCategory,
         description: transactionDescription,
         date: new Date().toISOString().slice(0, 10),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         location: transactionLocation,
         tags: []
       };
+      if (selectedBudget) {
+        newTransaction.budgetId = selectedBudget._id;
+      }
+      console.log('Creating transaction:', newTransaction);
       await apiAddTransaction(newTransaction, token);
       setShowAddTransaction(false);
       setTransactionAmount('');
       setTransactionCategory('');
       setTransactionDescription('');
       setTransactionLocation('');
+      setShowNewCategoryInput(false);
+      setNewCategoryName('');
+      setNewCategoryLimit('');
       fetchTransactions();
+      fetchBudgets();
     } catch (err) {
       setError(err.message);
+      console.error('Failed to add transaction', err);
     }
   };
 
@@ -178,6 +222,15 @@ const Transactions = () => {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const netAmount = totalIncome - totalExpenses;
+
+  // Helper to get the display name for a transaction's category
+  const getTransactionCategoryName = (transaction) => {
+    if (transaction.budgetId) {
+      const budget = budgets.find(b => b._id === transaction.budgetId);
+      return budget ? budget.name : transaction.category;
+    }
+    return transaction.category;
+  };
 
   return (
     <div className="space-y-6">
@@ -246,7 +299,7 @@ const Transactions = () => {
             className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="all">All Categories</option>
-            {categories.map(category => (
+            {allCategories.map(category => (
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
@@ -284,11 +337,14 @@ const Transactions = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getCategoryIcon(transaction.category)}</span>
+                    <span className="text-2xl">{getCategoryIcon(getTransactionCategoryName(transaction))}</span>
                     <div>
-                      <p className="font-semibold text-gray-800">{transaction.description}</p>
+                      <p className="font-semibold text-gray-800">
+                        <span className="mr-2">{getCategoryIcon(getTransactionCategoryName(transaction))}</span>
+                        {transaction.description}
+                      </p>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span>{transaction.category}</span>
+                        <span>{getTransactionCategoryName(transaction)}</span>
                         <span>•</span>
                         <span>{transaction.location}</span>
                         <span>•</span>
@@ -371,17 +427,48 @@ const Transactions = () => {
                 className="w-full p-3 border border-gray-300 rounded-lg"
                 required
               />
-              <select
-                value={transactionCategory}
-                onChange={(e) => setTransactionCategory(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg"
-                required
-              >
-                <option value="">Select Category</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
+              {showNewCategoryInput ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Enter new category name"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg mt-2"
+                    required
+                  />
+                  <input
+                    type="number"
+                    placeholder="Enter budget limit (₹)"
+                    value={newCategoryLimit}
+                    onChange={e => setNewCategoryLimit(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg mt-2"
+                    required
+                    min="1"
+                  />
+                </>
+              ) : (
+                <select
+                  value={transactionCategory}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') {
+                      setShowNewCategoryInput(true);
+                      setTransactionCategory('');
+                    } else {
+                      setShowNewCategoryInput(false);
+                      setTransactionCategory(e.target.value);
+                    }
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-lg"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {allCategories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                  <option key="__new__" value="__new__">+ Add new category</option>
+                </select>
+              )}
               <input
                 type="text"
                 placeholder="Description"

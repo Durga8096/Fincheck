@@ -16,10 +16,7 @@ import {
   Plus,
   Edit3,
   Trash2,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Calendar
+  DollarSign
 } from 'lucide-react';
 
 const Budget = () => {
@@ -38,8 +35,6 @@ const Budget = () => {
   const [editData, setEditData] = useState({});
   const [error, setError] = useState('');
 
-  // Add state and modal for adjusting spent
-  // Remove Adjust Spent state and modal
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState(null);
   const [expenseAmount, setExpenseAmount] = useState('');
@@ -54,6 +49,8 @@ const Budget = () => {
   const [editExpenseDate, setEditExpenseDate] = useState('');
   const [editExpenseError, setEditExpenseError] = useState('');
 
+  const [deletingBudgetId, setDeletingBudgetId] = useState(null);
+
   useEffect(() => {
     fetchBudgetsAndTransactions();
   }, []);
@@ -66,20 +63,22 @@ const Budget = () => {
       const [budgetsData, transactionsData] = await Promise.all([
         apiGetBudgets(token),
         apiGetTransactions(token)
+
       ]);
       setBudgets(budgetsData);
       setTransactions(transactionsData);
+      console.log(transactionsData);
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
   };
 
-  // For each budget, compute spent from transactions
   const budgetsWithSpent = budgets.map(budget => {
     const spent = transactions
       .filter(t => t.type === 'expense' && t.category === budget.name)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((total, t) => budget.limit ? total + t.amount : total, 0);
+    console.log(spent);
     return { ...budget, spent };
   });
 
@@ -88,7 +87,7 @@ const Budget = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const budget = await apiAddBudget({
+      await apiAddBudget({
         ...newBudget,
         limit: parseFloat(newBudget.limit)
       }, token);
@@ -102,17 +101,68 @@ const Budget = () => {
 
   const handleDeleteBudget = async (id) => {
     setError('');
+    setDeletingBudgetId(id);
+    const token = localStorage.getItem('token');
     try {
-      const token = localStorage.getItem('token');
+      const linkedTransactions = transactions.filter(t => t.type === 'expense' && t.budgetId === id);
+
+      if (linkedTransactions.length > 0) {
+        const uniqueCategories = [...new Set(linkedTransactions.map(t => t.category))];
+        for (const categoryName of uniqueCategories) {
+          // Re-fetch budgets to ensure we have the most up-to-date list before checking/creating
+          const currentBudgets = await apiGetBudgets(token);
+          let existingBudget = currentBudgets.find(b => b.name === categoryName && (b._id || b.id) !== id);
+
+          if (!existingBudget) {
+            const payload = {
+              name: categoryName,
+              limit: 0,
+              color: '#FF6B6B',
+              icon: '📊',
+              alertThreshold: 80
+            };
+            try {
+              existingBudget = await apiAddBudget(payload, token);
+              // After adding a new budget, refetch all budgets and transactions to update state
+              await fetchBudgetsAndTransactions();
+            } catch (err) {
+              console.error('Failed to add budget for reassignment', payload, err);
+              // If error is due to duplicate name, try to find the budget again from updated list
+              const updatedBudgets = await apiGetBudgets(token);
+              existingBudget = updatedBudgets.find(b => b.name === categoryName && (b._id || b.id) !== id);
+              if (!existingBudget) {
+                setError('Failed to create or find new budget for category: ' + categoryName);
+                setDeletingBudgetId(null);
+                return;
+              }
+            }
+          }
+
+          const txToUpdate = linkedTransactions.filter(t => t.category === categoryName);
+          for (const tx of txToUpdate) {
+            try {
+              await apiUpdateTransaction(tx.id || tx._id, { ...tx, budgetId: existingBudget._id || existingBudget.id });
+            } catch (err) {
+              setError('Failed to reassign transaction to new budget.');
+              setDeletingBudgetId(null);
+              console.error(err);
+              return;
+            }
+          }
+        }
+      }
       await apiDeleteBudget(id, token);
       fetchBudgetsAndTransactions();
     } catch (err) {
-      setError(err.message);
+      setError('Failed to delete budget: ' + (err.message || err));
+      console.error(err);
+    } finally {
+      setDeletingBudgetId(null);
     }
   };
 
   const handleEditBudget = (budget) => {
-    setEditingId(budget.id);
+    setEditingId(budget._id || budget.id); // Ensure correct ID is set for editing
     setEditData({ ...budget });
   };
 
@@ -121,7 +171,7 @@ const Budget = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      await apiUpdateBudget(editingId, editData, token);
+      await apiUpdateBudget(editingId, { ...editData, limit: parseFloat(editData.limit) }, token); // Ensure limit is number
       setEditingId(null);
       setEditData({});
       fetchBudgetsAndTransactions();
@@ -152,7 +202,8 @@ const Budget = () => {
         date: expenseDate,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         location: '',
-        tags: []
+        tags: [],
+        budgetId: expenseCategory._id || expenseCategory.id
       }, token);
       setShowAddExpense(false);
       fetchBudgetsAndTransactions();
@@ -175,11 +226,12 @@ const Budget = () => {
     setEditExpenseError('');
     try {
       const token = localStorage.getItem('token');
-      await apiUpdateTransaction(editExpense.id, {
+      await apiUpdateTransaction(editExpense._id || editExpense.id, { // Ensure correct ID is passed
         ...editExpense,
         amount: parseFloat(editExpenseAmount),
         description: editExpenseDescription,
-        date: editExpenseDate
+        date: editExpenseDate,
+        budgetId: editExpense.budgetId || editExpense._id // budgetId should already be on editExpense
       }, token);
       setShowEditExpense(false);
       fetchBudgetsAndTransactions();
@@ -198,7 +250,7 @@ const Budget = () => {
     }
   };
 
-  const getProgressPercentage = (spent, limit) => Math.min((spent / limit) * 100, 100);
+  const getProgressPercentage = (spent, limit) => (limit === 0) ? 0 : Math.min((spent / limit) * 100, 100);
   const getProgressColor = (percentage) => {
     if (percentage >= 100) return 'bg-red-500';
     if (percentage >= 90) return 'bg-orange-500';
@@ -206,18 +258,18 @@ const Budget = () => {
     return 'bg-green-500';
   };
   const getStatusIcon = (category) => {
-    const percentage = (category.spent / category.limit) * 100;
+    const percentage = getProgressPercentage(category.spent, category.limit);
     if (percentage >= 100) return <AlertTriangle size={20} className="text-red-500" />;
     if (percentage >= category.alertThreshold) return <AlertTriangle size={20} className="text-orange-500" />;
     return <CheckCircle size={20} className="text-green-500" />;
   };
   const icons = ['🍽️', '🚗', '🎬', '⚡', '🛍️', '🏥', '📚', '💼', '🏠', '✈️', '🎮', '💄'];
 
-  // Use budgetsWithSpent for all calculations and UI
-  const totalBudget = budgetsWithSpent.reduce((sum, cat) => sum + cat.limit, 0);
-  const totalSpent = budgetsWithSpent.reduce((sum, cat) => sum + cat.spent, 0);
+  const totalBudget = budgetsWithSpent.reduce((sum, cat) => sum + (parseFloat(cat.limit) || 0), 0);
+  const totalSpent = budgetsWithSpent.reduce((sum, cat) => sum + (parseFloat(cat.spent) || 0), 0);
   const totalRemaining = totalBudget - totalSpent;
-  const overallProgress = (totalSpent / totalBudget) * 100;
+  const overallProgress = getProgressPercentage(totalSpent, totalBudget);
+
 
   return (
     <div className="space-y-6">
@@ -275,7 +327,7 @@ const Budget = () => {
           <span className="text-sm text-gray-600">{overallProgress.toFixed(1)}% Used</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-4">
-          <div 
+          <div
             className={`h-4 rounded-full transition-all duration-300 ${getProgressColor(overallProgress)}`}
             style={{ width: `${Math.min(overallProgress, 100)}%` }}
           ></div>
@@ -292,21 +344,20 @@ const Budget = () => {
         <h3 className="text-xl font-semibold text-gray-800 mb-6">Budget Categories</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {loading ? <div>Loading...</div> : budgetsWithSpent.map((category) => {
-            const percentage = (category.spent / category.limit) * 100;
+            const percentage = getProgressPercentage(category.spent, category.limit);
             const isOverBudget = percentage > 100;
             const isNearLimit = percentage >= category.alertThreshold;
-            
+
             const categoryExpenses = transactions
-              .filter(t => t.type === 'expense' && t.category === category.name)
+              .filter(t => t.type === 'expense' && (t.budgetId === category._id || t.budgetId === category.id)) // Consistent access
               .sort((a, b) => new Date(b.date) - new Date(a.date))
               .slice(0, 5);
 
             return (
-              <div key={category.id} className={`p-4 border-2 rounded-lg ${
-                isOverBudget ? 'border-red-300 bg-red-50' :
-                isNearLimit ? 'border-orange-300 bg-orange-50' :
-                'border-gray-200 bg-white'
-              }`}>
+              <div key={category._id || category.id} className={`p-4 border-2 rounded-lg ${isOverBudget ? 'border-red-300 bg-red-50' :
+                  isNearLimit ? 'border-orange-300 bg-orange-50' :
+                    'border-gray-200 bg-white'
+                }`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{category.icon}</span>
@@ -321,19 +372,21 @@ const Budget = () => {
                       onClick={() => handleEditBudget(category)}
                       className="text-gray-400 hover:text-blue-600 transition-colors"
                       title="Edit Budget"
+                      type="button"
                     >
                       <Edit3 size={16} />
                     </button>
                     <button
-                      onClick={() => handleDeleteBudget(category._id)}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      onClick={() => handleDeleteBudget(category._id || category.id)}
+                      className={`text-gray-400 hover:text-red-600 transition-colors ${deletingBudgetId === (category._id || category.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={deletingBudgetId === (category._id || category.id)}
+                      type="button"
                     >
                       <Trash2 size={16} />
                     </button>
-                    {/* Remove Adjust Spent button */}
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Spent</span>
@@ -345,9 +398,8 @@ const Budget = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Remaining</span>
-                    <span className={`font-semibold ${
-                      category.limit - category.spent < 0 ? 'text-red-600' : 'text-green-600'
-                    }`}>
+                    <span className={`font-semibold ${category.limit - category.spent < 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
                       ₹{(category.limit - category.spent).toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -359,7 +411,7 @@ const Budget = () => {
                     <span>{isOverBudget ? 'Over Budget!' : 'Used'}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
+                    <div
                       className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(percentage)}`}
                       style={{ width: `${Math.min(percentage, 100)}%` }}
                     ></div>
@@ -378,9 +430,9 @@ const Budget = () => {
                   <h5 className="font-semibold text-gray-700 mb-2">Recent Expenses</h5>
                   {categoryExpenses.length === 0 && <div className="text-gray-400 text-sm">No expenses yet.</div>}
                   {categoryExpenses.map(expense => (
-                    <div key={expense.id} className="flex items-center justify-between p-2 border-b last:border-b-0">
+                    <div key={expense._id || expense.id} className="flex items-center justify-between p-2 border-b last:border-b-0">
                       <div>
-                        <div className="font-medium text-gray-800">₹{expense.amount}</div>
+                        <div className="font-medium text-gray-800">₹{expense.amount.toLocaleString('en-IN')}</div>
                         <div className="text-xs text-gray-500">{expense.description} • {expense.date}</div>
                       </div>
                       <div className="flex gap-2">
@@ -393,7 +445,7 @@ const Budget = () => {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDeleteExpense(expense.id)}
+                          onClick={() => handleDeleteExpense(expense._id || expense.id)}
                           className="text-red-500 hover:text-red-700 text-xs"
                           title="Delete"
                           type="button"
@@ -417,10 +469,10 @@ const Budget = () => {
           <h3 className="text-xl font-semibold text-gray-800">Budget Alerts</h3>
         </div>
         <div className="space-y-3">
-          {budgetsWithSpent.filter(cat => (cat.spent / cat.limit) * 100 >= cat.alertThreshold).map(category => {
-            const percentage = (category.spent / category.limit) * 100;
+          {budgetsWithSpent.filter(cat => getProgressPercentage(cat.spent, cat.limit) >= cat.alertThreshold).map(category => {
+            const percentage = getProgressPercentage(category.spent, category.limit);
             return (
-              <div key={category._id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div key={category._id || category.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{category.icon}</span>
                   <div>
@@ -432,14 +484,14 @@ const Budget = () => {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-gray-800">
-                    ₹{category.spent} / ₹{category.limit}
+                    ₹{category.spent.toLocaleString('en-IN')} / ₹{category.limit.toLocaleString('en-IN')}
                   </p>
                   <p className="text-sm text-orange-600">{percentage.toFixed(1)}% used</p>
                 </div>
               </div>
             );
           })}
-          {budgetsWithSpent.filter(cat => (cat.spent / cat.limit) * 100 >= cat.alertThreshold).length === 0 && (
+          {budgetsWithSpent.filter(cat => getProgressPercentage(cat.spent, cat.limit) >= cat.alertThreshold).length === 0 && (
             <p className="text-gray-500 text-center py-4">No budget alerts at this time</p>
           )}
         </div>
@@ -451,7 +503,7 @@ const Budget = () => {
           <div className="bg-white p-6 rounded-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Add Budget Category</h3>
-              <button 
+              <button
                 onClick={() => setShowAddBudget(false)}
                 className="text-gray-500 hover:text-gray-700"
                 type="button"
@@ -460,7 +512,7 @@ const Budget = () => {
               </button>
             </div>
             <form onSubmit={handleAddBudget} className="space-y-4">
-              {error && <div className="text-red-500 text-sm">{error}</div>}
+              {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category Name</label>
                 <input
@@ -491,9 +543,8 @@ const Budget = () => {
                       key={index}
                       type="button"
                       onClick={() => setNewBudget({ ...newBudget, icon })}
-                      className={`p-2 text-xl rounded-lg border-2 ${
-                        newBudget.icon === icon ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
+                      className={`p-2 text-xl rounded-lg border-2 ${newBudget.icon === icon ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                        }`}
                     >
                       {icon}
                     </button>
@@ -545,14 +596,16 @@ const Budget = () => {
           <div className="bg-white p-6 rounded-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Edit Budget Category</h3>
-              <button 
+              <button
                 onClick={() => { setEditingId(null); setEditData({}); }}
                 className="text-gray-500 hover:text-gray-700"
+                type="button"
               >
                 ✕
               </button>
             </div>
             <form onSubmit={handleUpdateBudget} className="space-y-4">
+              {error && <div className="text-red-500 text-sm mb-2">{error}</div>} {/* Display error here too */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category Name</label>
                 <input
@@ -581,9 +634,8 @@ const Budget = () => {
                       key={index}
                       type="button"
                       onClick={() => setEditData({ ...editData, icon })}
-                      className={`p-2 text-xl rounded-lg border-2 ${
-                        editData.icon === icon ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
+                      className={`p-2 text-xl rounded-lg border-2 ${editData.icon === icon ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                        }`}
                     >
                       {icon}
                     </button>
@@ -594,8 +646,10 @@ const Budget = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Alert Threshold (%)</label>
                 <input
                   type="number"
+                  min="50"
+                  max="100"
                   value={editData.alertThreshold || ''}
-                  onChange={(e) => setEditData({ ...editData, alertThreshold: e.target.value })}
+                  onChange={(e) => setEditData({ ...editData, alertThreshold: parseInt(e.target.value) })}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -626,7 +680,7 @@ const Budget = () => {
           <div className="bg-white p-6 rounded-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Add Expense to {expenseCategory?.name}</h3>
-              <button 
+              <button
                 onClick={() => setShowAddExpense(false)}
                 className="text-gray-500 hover:text-gray-700"
                 type="button"
@@ -692,7 +746,7 @@ const Budget = () => {
           <div className="bg-white p-6 rounded-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Edit Expense</h3>
-              <button 
+              <button
                 onClick={() => setShowEditExpense(false)}
                 className="text-gray-500 hover:text-gray-700"
                 type="button"
@@ -751,11 +805,8 @@ const Budget = () => {
           </div>
         </div>
       )}
-
-      {/* Remove Adjust Spent state and modal */}
-      {/* Remove showAdjustSpent, adjustSpentValue, adjustCategoryId, handleAdjustSpent, handleSaveAdjustSpent, and the Adjust Spent modal */}
     </div>
   );
 };
 
-export default Budget; 
+export default Budget;

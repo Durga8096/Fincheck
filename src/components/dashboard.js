@@ -20,7 +20,7 @@ const Dashboard = () => {
         <nav className="flex-grow p-4">
           <ul className="space-y-4">
             <li>
-              <Link to="/dashboard/home" className="block p-2 rounded hover:bg-gray-700">
+              <Link to="/dashboard" className="block p-2 rounded hover:bg-gray-700">
                 Home
               </Link>
             </li>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Signup = () => {
   const [email, setEmail] = useState('');
@@ -8,6 +9,7 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { register } = useAuth();
+  const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -15,7 +17,7 @@ const Signup = () => {
     setSuccess('');
     try {
       await register(name, email, password);
-      setSuccess('Registration successful! You can now log in.');
+      navigate('/login', { state: { message: 'Now you can login.' } });
     } catch (err) {
       setError(err.message || 'Registration failed.');
     }

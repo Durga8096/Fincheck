@@ -149,10 +149,10 @@ const Home = () => {
             <span>Monthly Budget</span>
             <span className="font-semibold">{formatINR(budget)}</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(monthlyExpenses / budget) * 100}%` }}
+              style={{ width: `${Math.min((monthlyExpenses / budget) * 100, 100)}%`, minWidth: (monthlyExpenses > 0 && (monthlyExpenses / budget) * 100 < 2) ? '2%' : undefined }}
             ></div>
           </div>
           <div className="flex justify-between text-sm text-gray-600">
@@ -174,8 +174,23 @@ const Home = () => {
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{getCategoryIcon(transaction.category)}</span>
                 <div>
-                  <p className="font-medium text-gray-800">{transaction.description}</p>
-                  <p className="text-sm text-gray-600">{transaction.category} • {transaction.date}</p>
+                  <p className="font-medium text-gray-800">
+                    <span className="mr-2">{getCategoryIcon(transaction.category)}</span>
+                    {transaction.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span>{transaction.category}</span>
+                    {transaction.location && <><span>•</span><span>{transaction.location}</span></>}
+                    {transaction.date && <><span>•</span><span>{transaction.date}</span></>}
+                    {transaction.time && <><span>•</span><span>{transaction.time}</span></>}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    {transaction.tags && transaction.tags.map((tag, index) => (
+                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
@@ -219,7 +234,7 @@ const Home = () => {
           <div className="bg-white p-6 rounded-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Add Transaction</h3>
-              <button 
+              <button
                 onClick={() => setShowAddTransaction(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -231,11 +246,10 @@ const Home = () => {
                 <button
                   type="button"
                   onClick={() => setTransactionType('expense')}
-                  className={`flex-1 p-2 rounded-lg border ${
-                    transactionType === 'expense' 
-                      ? 'bg-red-100 border-red-300 text-red-700' 
+                  className={`flex-1 p-2 rounded-lg border ${transactionType === 'expense'
+                      ? 'bg-red-100 border-red-300 text-red-700'
                       : 'border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Minus size={16} className="inline mr-1" />
                   Expense
@@ -243,11 +257,10 @@ const Home = () => {
                 <button
                   type="button"
                   onClick={() => setTransactionType('income')}
-                  className={`flex-1 p-2 rounded-lg border ${
-                    transactionType === 'income' 
-                      ? 'bg-green-100 border-green-300 text-green-700' 
+                  className={`flex-1 p-2 rounded-lg border ${transactionType === 'income'
+                      ? 'bg-green-100 border-green-300 text-green-700'
                       : 'border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Plus size={16} className="inline mr-1" />
                   Income
@@ -268,14 +281,17 @@ const Home = () => {
                 required
               >
                 <option value="">Select Category</option>
-                <option value="Groceries">Groceries</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Entertainment">Entertainment</option>
-                <option value="Transport">Transport</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Shopping">Shopping</option>
-                <option value="Salary">Salary</option>
-                <option value="Freelance">Freelance</option>
+                {transactionType === 'expense'
+                  ? budgets.map(budget => (
+                    <option key={budget.name} value={budget.name}>{budget.name}</option>
+                  ))
+                  : [
+                    'Salary',
+                    'Freelance',
+                    'Other Income'
+                  ].map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
               </select>
               <input
                 type="text"

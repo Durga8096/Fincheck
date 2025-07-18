@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -8,6 +8,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const { login } = useAuth(); 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault(); 
@@ -30,6 +31,9 @@ const Login = () => {
         className="w-full max-w-md p-6 bg-white rounded shadow"
       >
         <h2 className="mb-6 text-2xl font-bold text-center">Login</h2>
+        {location.state && location.state.message && (
+          <div className="mb-4 text-green-600">{location.state.message}</div>
+        )}
         {error && <div className="mb-4 text-red-600">{error}</div>} {/* Display error message */}
         <input
           type="email"

@@ -1,0 +1,7 @@
+# For reference only. Use package.json for actual Node.js dependencies.
+express
+mongoose
+bcryptjs
+jsonwebtoken
+cors
+body-parser 

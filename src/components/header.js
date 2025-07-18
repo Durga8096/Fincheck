@@ -7,7 +7,7 @@ const Header = () => {
       <div className="container mx-auto px-2 py-2 flex justify-between items-center">
       <a href="/">
   <span>
-    <img className="w-42 h-16 cursor-pointer" src="logo.png" alt="Logo" />
+    <img className="w-42 h-16 cursor-pointer" src="/logo.png" alt="Logo" />
   </span>
 </a>
         <nav>

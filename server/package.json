@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "npm start",
+    "build":"npm run build"
   },
   "dependencies": {
     "express": "^5.1.0",
